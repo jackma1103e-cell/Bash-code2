@@ -1,0 +1,1372 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CyberBash - Interactive Script Toolkit & Simulator</title>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com"></script>
+<!-- Lucide Icons -->
+<script src="https://unpkg.com/lucide@latest"></script>
+<!-- Google Fonts: Fira Code & Rajdhani -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css?family=Fira+Code:wght@300;400;500;600;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<script>
+tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      fontFamily: {
+        mono: ['Fira Code', 'monospace'],
+        sans: ['Rajdhani', 'sans-serif'],
+      },
+      colors: {
+        cyber: {
+          black: '#0a0c10',
+          dark: '#0f141d',
+          panel: '#151c28',
+          border: '#1e293b',
+          neonGreen: '#00ff66',
+          neonCyan: '#00f0ff',
+          neonPink: '#ff0055',
+          neonYellow: '#ffe600',
+          neonPurple: '#a855f7'
+        }
+      },
+      boxShadow: {
+        'neon-green': '0 0 15px rgba(0, 255, 102, 0.4)',
+        'neon-cyan': '0 0 15px rgba(0, 240, 255, 0.4)',
+        'neon-pink': '0 0 15px rgba(255, 0, 85, 0.4)',
+        'glass': '0 8px 32px 0 rgba(0, 0, 0, 0.37)'
+      }
+    }
+  }
+}
+</script>
+<style>
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0f141d;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #00f0ff;
+}
+/* Scanline effect */
+.scanline-bg {
+  background: linear-gradient(
+    rgba(18, 16, 16, 0) 50%,
+    rgba(0, 0, 0, 0.25) 50%
+  ), linear-gradient(
+    90deg,
+    rgba(255, 0, 0, 0.03),
+    rgba(0, 255, 0, 0.01),
+    rgba(0, 0, 255, 0.03)
+  );
+  background-size: 100% 4px, 6px 100%;
+}
+/* Glow utility classes */
+.glow-cyan {
+  text-shadow: 0 0 8px rgba(0, 240, 255, 0.6);
+}
+.glow-green {
+  text-shadow: 0 0 8px rgba(0, 255, 102, 0.6);
+}
+.glow-pink {
+  text-shadow: 0 0 8px rgba(255, 0, 85, 0.6);
+}
+/* Glassmorphism panel */
+.cyber-glass {
+  background: rgba(21, 28, 40, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 240, 255, 0.15);
+}
+/* Matrix canvas overlay */
+#matrixCanvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 0.12;
+  z-index: 0;
+}
+.crt-flicker {
+  animation: flicker 0.15s infinite alternate;
+}
+@keyframes flicker {
+  0% { opacity: 0.98; }
+  100% { opacity: 1; }
+}
+</style>
+</head>
+<body class="bg-cyber-black text-slate-200 font-sans h-screen overflow-hidden flex flex-col relative select-none">
+<!-- Matrix Background Canvas -->
+<canvas id="matrixCanvas"></canvas>
+
+<!-- RICKROLL POPUP MODAL -->
+<div id="rickrollModal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+  <div class="bg-cyber-dark border border-cyber-neonPink/60 rounded-xl w-full max-w-lg flex flex-col shadow-2xl overflow-hidden font-mono text-center p-6 space-y-4">
+    <h2 class="text-2xl font-bold text-cyber-neonPink glow-pink animate-pulse">SYSTEM WARNING: NEVER GONNA GIVE YOU UP!</h2>
+    <p class="text-xs text-slate-400">Scheduled 1-minute security protocol triggered successfully.</p>
+    <div class="rounded-lg overflow-hidden border border-cyber-neonPink/30 shadow-neon-pink">
+      <img src="https://i.giphy.com/media/Vuw9m5wXviFIQ/giphy.webp" alt="Rickroll" class="w-full h-auto object-cover" />
+    </div>
+    <button id="closeRickrollBtn" class="px-4 py-2 bg-cyber-neonPink/20 border border-cyber-neonPink/50 hover:bg-cyber-neonPink/30 text-cyber-neonPink font-bold rounded text-xs transition-all">
+      CLOSE & RESUME PROTOCOL
+    </button>
+  </div>
+</div>
+
+<!-- TOP HEADER / NAV -->
+<header class="relative z-10 bg-cyber-dark/80 border-b border-cyber-cyan/20 px-6 py-3 flex items-center justify-between backdrop-blur-md">
+  <div class="flex items-center gap-3">
+    <div class="relative flex items-center justify-center w-10 h-10 rounded-lg bg-cyber-cyan/10 border border-cyber-cyan/40 text-cyber-cyan shadow-neon-cyan">
+      <i data-lucide="terminal" class="w-6 h-6"></i>
+    </div>
+    <div>
+      <h1 class="text-xl font-bold tracking-wider text-white flex items-center gap-2 font-mono">
+        CYBER<span class="text-cyber-cyan glow-cyan">BASH</span> v2.4
+        <span class="text-xs bg-cyber-neonGreen/10 text-cyber-neonGreen border border-cyber-neonGreen/30 px-2 py-0.5 rounded-full font-mono font-normal">ONLINE</span>
+      </h1>
+      <p class="text-xs text-slate-400 font-mono">Interactive Shell Script Execution Framework & Simulation Suite</p>
+    </div>
+  </div>
+  <!-- Quick Stats Bar & Controls -->
+  <div class="flex items-center gap-4">
+    <div class="hidden md:flex items-center gap-6 font-mono text-xs bg-cyber-panel/80 px-4 py-2 rounded-lg border border-slate-800">
+      <div class="flex items-center gap-2">
+        <i data-lucide="hard-drive" class="w-4 h-4 text-cyber-neonCyan"></i>
+        <span>FILES: <strong id="headerFileCount" class="text-cyber-neonCyan">4</strong></span>
+      </div>
+      <div class="flex items-center gap-2">
+        <i data-lucide="cpu" class="w-4 h-4 text-cyber-neonGreen"></i>
+        <span>SYS MEM: <strong class="text-cyber-neonGreen">64 KB</strong></span>
+      </div>
+      <div class="flex items-center gap-2">
+        <i data-lucide="activity" class="w-4 h-4 text-cyber-neonPink"></i>
+        <span>STATUS: <strong class="text-cyber-neonPink">READY</strong></span>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <button id="sfxToggle" title="Toggle Sound FX" class="p-2.5 rounded-lg bg-cyber-panel hover:bg-cyber-cyan/10 border border-slate-700 hover:border-cyber-cyan text-slate-300 hover:text-cyber-cyan transition-all">
+        <i data-lucide="volume-2" id="sfxIcon" class="w-4 h-4"></i>
+      </button>
+      <button id="matrixToggle" title="Toggle Matrix Effect" class="p-2.5 rounded-lg bg-cyber-panel hover:bg-cyber-neonGreen/10 border border-slate-700 hover:border-cyber-neonGreen text-slate-300 hover:text-cyber-neonGreen transition-all">
+        <i data-lucide="sparkles" class="w-4 h-4"></i>
+      </button>
+      <button id="viewScriptBtn" class="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-cyber-cyan/10 hover:bg-cyber-cyan/20 border border-cyber-cyan/40 text-cyber-cyan font-mono text-xs font-semibold shadow-neon-cyan transition-all">
+        <i data-lucide="code" class="w-4 h-4"></i>
+        <span>EXPORT SCRIPT</span>
+      </button>
+    </div>
+  </div>
+</header>
+<!-- MAIN CONTENT AREA -->
+<div class="relative z-10 flex-1 flex overflow-hidden">
+  <!-- LEFT NAVIGATION SIDEBAR -->
+  <aside class="w-72 bg-cyber-dark/90 border-r border-slate-800/80 flex flex-col justify-between p-3 gap-3 overflow-y-auto font-mono text-xs">
+    <div class="space-y-1">
+      <div class="text-[10px] uppercase font-bold text-slate-500 tracking-widest px-3 py-1">Command Navigation</div>
+      <button data-tab="tab-terminal" class="nav-btn active w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left transition-all bg-cyber-cyan/10 border border-cyber-cyan/40 text-cyber-cyan shadow-neon-cyan">
+        <div class="flex items-center gap-2.5">
+          <i data-lucide="terminal" class="w-4 h-4"></i>
+          <span>Interactive Terminal</span>
+        </div>
+        <span class="text-[10px] bg-cyber-cyan/20 px-1.5 py-0.5 rounded text-cyber-cyan">SHELL</span>
+      </button>
+      <button data-tab="tab-read" class="nav-btn w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left transition-all hover:bg-slate-800/60 border border-transparent hover:border-slate-700 text-slate-300">
+        <div class="flex items-center gap-2.5">
+          <i data-lucide="file-text" class="w-4 h-4 text-cyber-neonGreen"></i>
+          <span>1) Read File</span>
+        </div>
+        <span class="text-[10px] text-slate-500">cat</span>
+      </button>
+      <button data-tab="tab-copy" class="nav-btn w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left transition-all hover:bg-slate-800/60 border border-transparent hover:border-slate-700 text-slate-300">
+        <div class="flex items-center gap-2.5">
+          <i data-lucide="copy" class="w-4 h-4 text-cyber-neonCyan"></i>
+          <span>2) Copy File Diff</span>
+        </div>
+        <span class="text-[10px] text-slate-500">cp</span>
+      </button>
+      <button data-tab="tab-write" class="nav-btn w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left transition-all hover:bg-slate-800/60 border border-transparent hover:border-slate-700 text-slate-300">
+        <div class="flex items-center gap-2.5">
+          <i data-lucide="edit-3" class="w-4 h-4 text-cyber-neonYellow"></i>
+          <span>3) Text Editor / Writer</span>
+        </div>
+        <span class="text-[10px] text-slate-500">write</span>
+      </button>
+      <button data-tab="tab-string" class="nav-btn w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left transition-all hover:bg-slate-800/60 border border-transparent hover:border-slate-700 text-slate-300">
+        <div class="flex items-center gap-2.5">
+          <i data-lucide="git-compare" class="w-4 h-4 text-cyber-neonPink"></i>
+          <span>4) Compare Strings</span>
+        </div>
+        <span class="text-[10px] text-slate-500">test ==</span>
+      </button>
+      <button data-tab="tab-grep" class="nav-btn w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left transition-all hover:bg-slate-800/60 border border-transparent hover:border-slate-700 text-slate-300">
+        <div class="flex items-center gap-2.5">
+          <i data-lucide="search" class="w-4 h-4 text-cyber-neonPurple"></i>
+          <span>5) Search Word / Grep</span>
+        </div>
+        <span class="text-[10px] text-slate-500">grep</span>
+      </button>
+      <button data-tab="tab-number" class="nav-btn w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left transition-all hover:bg-slate-800/60 border border-transparent hover:border-slate-700 text-slate-300">
+        <div class="flex items-center gap-2.5">
+          <i data-lucide="calculator" class="w-4 h-4 text-amber-400"></i>
+          <span>6) Compare Numbers</span>
+        </div>
+        <span class="text-[10px] text-slate-500">test -gt</span>
+      </button>
+      <button data-tab="tab-stats" class="nav-btn w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left transition-all hover:bg-slate-800/60 border border-transparent hover:border-slate-700 text-slate-300">
+        <div class="flex items-center gap-2.5">
+          <i data-lucide="bar-chart-2" class="w-4 h-4 text-teal-400"></i>
+          <span>7) File Inspector / Stats</span>
+        </div>
+        <span class="text-[10px] text-slate-500">wc</span>
+      </button>
+      <button data-tab="tab-append" class="nav-btn w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left transition-all hover:bg-slate-800/60 border border-transparent hover:border-slate-700 text-slate-300">
+        <div class="flex items-center gap-2.5">
+          <i data-lucide="corner-down-right" class="w-4 h-4 text-emerald-400"></i>
+          <span>8) Append Text</span>
+        </div>
+        <span class="text-[10px] text-slate-500">&gt;&gt;</span>
+      </button>
+    </div>
+    <!-- VIRTUAL FILE EXPLORER IN SIDEBAR -->
+    <div class="border-t border-slate-800 pt-3 space-y-2">
+      <div class="flex items-center justify-between px-2 text-slate-400">
+        <span class="text-[11px] font-bold tracking-wider text-slate-400 flex items-center gap-1.5">
+          <i data-lucide="folder" class="w-3.5 h-3.5 text-cyber-neonCyan"></i>
+          VIRTUAL FS
+        </span>
+        <button id="addFileBtn" title="Create New Virtual File" class="p-1 hover:bg-slate-800 text-cyber-neonGreen hover:text-white rounded transition-colors">
+          <i data-lucide="plus" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <div id="fileExplorerList" class="space-y-1 max-h-44 overflow-y-auto pr-1">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+  </aside>
+  <!-- RIGHT MAIN CONTROLLER & DISPLAY WORKSPACE -->
+  <main class="flex-1 bg-cyber-black/90 flex flex-col p-4 overflow-hidden relative">
+    <!-- TAB 0: INTERACTIVE BASH TERMINAL -->
+    <section id="tab-terminal" class="tab-content flex-1 flex flex-col gap-3 h-full">
+      <div class="flex items-center justify-between bg-cyber-panel border border-slate-800 px-4 py-2 rounded-lg font-mono text-xs">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-red-500 inline-block"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-yellow-500 inline-block"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-green-500 inline-block"></span>
+          <span class="ml-2 text-slate-400">bash --login (tty1)</span>
+        </div>
+        <div class="flex items-center gap-3 text-slate-400">
+          <button id="clearTerminalBtn" class="hover:text-cyber-cyan flex items-center gap-1">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Clear
+          </button>
+          <span class="text-slate-600">|</span>
+          <button id="resetMenuBtn" class="hover:text-cyber-neonGreen flex items-center gap-1">
+            <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Show Menu
+          </button>
+        </div>
+      </div>
+      <div id="terminalScreen" class="flex-1 bg-cyber-dark border border-slate-800 rounded-lg p-4 font-mono text-sm overflow-y-auto flex flex-col gap-2 shadow-inner font-normal leading-relaxed text-slate-300 scanline-bg">
+        <!-- Terminal log output injected here -->
+      </div>
+      <div class="flex items-center bg-cyber-panel border border-slate-800 rounded-lg px-3 py-2 font-mono text-sm gap-2 focus-within:border-cyber-cyan transition-colors">
+        <span class="text-cyber-neonGreen font-bold flex items-center gap-1">
+          <span>user@cyberbash</span>
+          <span class="text-slate-500">:</span>
+          <span class="text-cyber-neonCyan">~</span>
+          <span class="text-slate-400">$</span>
+        </span>
+        <input type="text" id="terminalInput" placeholder="Type an option (0-8) or command (cat, ls, grep, help)..." class="flex-1 bg-transparent text-white outline-none font-mono caret-cyber-neonGreen" autocomplete="off" spellcheck="false" />
+        <button id="sendCmdBtn" class="px-3 py-1 bg-cyber-cyan/20 hover:bg-cyber-cyan/30 text-cyber-cyan rounded border border-cyber-cyan/40 text-xs font-semibold">
+          EXECUTE
+        </button>
+      </div>
+    </section>
+    <!-- TAB 1: FILE READER (cat) -->
+    <section id="tab-read" class="tab-content hidden flex-1 flex-col gap-4 h-full">
+      <div class="flex items-center justify-between bg-cyber-panel p-4 rounded-xl border border-slate-800">
+        <div>
+          <h2 class="text-lg font-bold text-cyber-neonGreen flex items-center gap-2">
+            <i data-lucide="file-text" class="w-5 h-5"></i>
+            Option 1: File Content Reader (cat)
+          </h2>
+          <p class="text-xs text-slate-400 font-mono">Select a file from virtual storage to inspect its content in real-time.</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <select id="readerFileSelect" class="bg-cyber-dark border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-2 font-mono focus:border-cyber-neonGreen outline-none">
+            <!-- Dynamically populated -->
+          </select>
+        </div>
+      </div>
+      <div class="flex-1 bg-cyber-dark border border-slate-800 rounded-xl p-4 flex flex-col font-mono text-sm overflow-hidden">
+        <div class="flex justify-between items-center pb-3 border-b border-slate-800 text-xs text-slate-400">
+          <span id="readerFileName" class="text-cyber-neonCyan font-bold">file.txt</span>
+          <div class="flex gap-4">
+            <span id="readerLineCount">0 Lines</span>
+            <span id="readerWordCount">0 Words</span>
+            <span id="readerCharCount">0 Bytes</span>
+          </div>
+        </div>
+        <div id="readerCodeViewer" class="flex-1 overflow-y-auto py-3 space-y-1 text-slate-300">
+          <!-- Rendered code with line numbers -->
+        </div>
+      </div>
+    </section>
+    <!-- TAB 2: COPY FILE (cp & diff) -->
+    <section id="tab-copy" class="tab-content hidden flex-1 flex-col gap-4 h-full">
+      <div class="bg-cyber-panel p-4 rounded-xl border border-slate-800 flex items-center justify-between">
+        <div>
+          <h2 class="text-lg font-bold text-cyber-neonCyan flex items-center gap-2">
+            <i data-lucide="copy" class="w-5 h-5"></i>
+            Option 2: Animated File Replication & Diff Tool (cp)
+          </h2>
+          <p class="text-xs text-slate-400 font-mono">Clone virtual files safely and compare source and target buffers.</p>
+        </div>
+        <button id="executeCopyBtn" class="px-4 py-2 bg-cyber-neonCyan/20 border border-cyber-neonCyan/50 hover:bg-cyber-neonCyan/30 text-cyber-neonCyan font-mono text-xs font-bold rounded-lg shadow-neon-cyan transition-all flex items-center gap-2">
+          <i data-lucide="arrow-right-left" class="w-4 h-4"></i>
+          EXECUTE COPY
+        </button>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 overflow-hidden font-mono">
+        <!-- Source Box -->
+        <div class="bg-cyber-dark border border-slate-800 rounded-xl p-4 flex flex-col gap-3">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+            <span class="text-xs font-bold text-slate-400 flex items-center gap-2">
+              <i data-lucide="file-input" class="w-4 h-4 text-cyber-neonCyan"></i> SOURCE FILE
+            </span>
+            <select id="copySourceSelect" class="bg-cyber-panel border border-slate-700 text-xs text-slate-200 rounded px-2.5 py-1">
+              <!-- File options -->
+            </select>
+          </div>
+          <div id="copySourceContent" class="flex-1 overflow-y-auto bg-cyber-panel/50 p-3 rounded text-xs text-slate-300 leading-relaxed">
+            <!-- Content -->
+          </div>
+        </div>
+        <!-- Target Box -->
+        <div class="bg-cyber-dark border border-slate-800 rounded-xl p-4 flex flex-col gap-3">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+            <span class="text-xs font-bold text-slate-400 flex items-center gap-2">
+              <i data-lucide="file-output" class="w-4 h-4 text-cyber-neonGreen"></i> TARGET FILENAME
+            </span>
+            <input type="text" id="copyTargetInput" value="copied_file.txt" class="bg-cyber-panel border border-slate-700 text-xs text-slate-200 rounded px-2.5 py-1 w-48 font-mono outline-none focus:border-cyber-neonGreen" />
+          </div>
+          <div id="copyTargetContent" class="flex-1 overflow-y-auto bg-cyber-panel/50 p-3 rounded text-xs text-slate-400 leading-relaxed italic flex items-center justify-center border border-dashed border-slate-800">
+            Click "Execute Copy" to initiate data transfer...
+          </div>
+        </div>
+      </div>
+    </section>
+    <!-- TAB 3: FILE EDITOR / WRITER -->
+    <section id="tab-write" class="tab-content hidden flex-1 flex-col gap-4 h-full">
+      <div class="bg-cyber-panel p-4 rounded-xl border border-slate-800 flex items-center justify-between">
+        <div>
+          <h2 class="text-lg font-bold text-cyber-neonYellow flex items-center gap-2">
+            <i data-lucide="edit-3" class="w-5 h-5"></i>
+            Option 3: Interactive File Editor / Writer
+          </h2>
+          <p class="text-xs text-slate-400 font-mono">Create or overwrite virtual files directly through the custom terminal editor buffer.</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <select id="writerFileSelect" class="bg-cyber-dark border border-slate-700 text-xs rounded-lg px-3 py-2 font-mono text-slate-200">
+            <!-- Files -->
+          </select>
+          <button id="saveWriteBtn" class="px-4 py-2 bg-cyber-neonYellow/20 border border-cyber-neonYellow/50 hover:bg-cyber-neonYellow/30 text-cyber-neonYellow font-mono text-xs font-bold rounded-lg transition-all flex items-center gap-2">
+            <i data-lucide="save" class="w-4 h-4"></i>
+            OVERWRITE FILE
+          </button>
+        </div>
+      </div>
+      <div class="flex-1 bg-cyber-dark border border-slate-800 rounded-xl p-4 flex flex-col font-mono text-sm gap-2">
+        <div class="flex items-center justify-between text-xs text-slate-400 pb-2 border-b border-slate-800">
+          <span>TYPE CONTENT BELOW (End line with 'x' behavior simulated on save)</span>
+          <span id="writerCharCount">0 chars</span>
+        </div>
+        <textarea id="writerTextArea" class="flex-1 bg-cyber-panel/60 text-slate-200 border border-slate-800 rounded-lg p-3 font-mono text-sm outline-none resize-none focus:border-cyber-neonYellow leading-relaxed" placeholder="Write your custom text lines here..."></textarea>
+      </div>
+    </section>
+    <!-- TAB 4: STRING COMPARATOR -->
+    <section id="tab-string" class="tab-content hidden flex-1 flex-col gap-4 h-full">
+      <div class="bg-cyber-panel p-4 rounded-xl border border-slate-800">
+        <h2 class="text-lg font-bold text-cyber-neonPink flex items-center gap-2">
+          <i data-lucide="git-compare" class="w-5 h-5"></i>
+          Option 4: String Inspector & Comparison Engine
+        </h2>
+        <p class="text-xs text-slate-400 font-mono">Real-time string evaluation, byte length diffs, and exact equality checking.</p>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="bg-cyber-dark border border-slate-800 rounded-xl p-4 flex flex-col gap-2">
+          <label class="text-xs font-mono text-slate-400">First String (string1)</label>
+          <input type="text" id="strInput1" value="CyberBash Terminal" class="bg-cyber-panel border border-slate-700 rounded p-2.5 text-sm font-mono text-white outline-none focus:border-cyber-neonPink" />
+        </div>
+        <div class="bg-cyber-dark border border-slate-800 rounded-xl p-4 flex flex-col gap-2">
+          <label class="text-xs font-mono text-slate-400">Second String (string2)</label>
+          <input type="text" id="strInput2" value="cyberbash terminal" class="bg-cyber-panel border border-slate-700 rounded p-2.5 text-sm font-mono text-white outline-none focus:border-cyber-neonPink" />
+        </div>
+      </div>
+      <!-- Evaluation Panel -->
+      <div class="flex-1 bg-cyber-dark border border-slate-800 rounded-xl p-5 flex flex-col justify-between font-mono">
+        <div class="space-y-4">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+            <span class="text-sm font-bold text-slate-400">Match Result:</span>
+            <span id="strMatchBadge" class="px-3 py-1 rounded text-xs font-bold">MATCH / DIFFERENT</span>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="bg-cyber-panel p-3 rounded-lg border border-slate-800">
+              <span class="text-[10px] text-slate-500 uppercase block">Str 1 Length</span>
+              <span id="str1Len" class="text-lg font-bold text-cyber-neonCyan">0</span>
+            </div>
+            <div class="bg-cyber-panel p-3 rounded-lg border border-slate-800">
+              <span class="text-[10px] text-slate-500 uppercase block">Str 2 Length</span>
+              <span id="str2Len" class="text-lg font-bold text-cyber-neonPink">0</span>
+            </div>
+            <div class="bg-cyber-panel p-3 rounded-lg border border-slate-800">
+              <span class="text-[10px] text-slate-500 uppercase block">Similarity</span>
+              <span id="strSimilarity" class="text-lg font-bold text-cyber-neonGreen">0%</span>
+            </div>
+          </div>
+          <!-- Terminal Code Equivalent -->
+          <div class="bg-cyber-black p-3 rounded border border-slate-800 text-xs space-y-1">
+            <div class="text-slate-500">// Shell Command Executed:</div>
+            <div class="text-cyber-neonGreen">if [ "$firstString" == "$secondString" ]; then ... fi</div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <!-- TAB 5: GREP SEARCH UTILITY -->
+    <section id="tab-grep" class="tab-content hidden flex-1 flex-col gap-4 h-full">
+      <div class="bg-cyber-panel p-4 rounded-xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-lg font-bold text-cyber-neonPurple flex items-center gap-2">
+            <i data-lucide="search" class="w-5 h-5"></i>
+            Option 5: Word Search & Grep Engine
+          </h2>
+          <p class="text-xs text-slate-400 font-mono">Locate matching words or patterns across file lines with syntax highlights.</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <input type="text" id="grepSearchTerm" placeholder="Enter word to find..." value="system" class="bg-cyber-dark border border-slate-700 text-xs text-white rounded-lg px-3 py-2 font-mono outline-none focus:border-cyber-neonPurple w-48" />
+          <select id="grepFileSelect" class="bg-cyber-dark border border-slate-700 text-xs text-slate-200 rounded-lg px-3 py-2 font-mono">
+            <!-- Files -->
+          </select>
+        </div>
+      </div>
+      <div class="flex-1 bg-cyber-dark border border-slate-800 rounded-xl p-4 flex flex-col font-mono text-sm overflow-hidden">
+        <div class="flex justify-between items-center pb-2 border-b border-slate-800 text-xs text-slate-400">
+          <span>SEARCH RESULTS (grep -n)</span>
+          <span id="grepMatchCount" class="text-cyber-neonPurple font-bold">0 matches</span>
+        </div>
+        <div id="grepResultsContainer" class="flex-1 overflow-y-auto py-3 space-y-2 text-xs">
+          <!-- Dynamic grep output -->
+        </div>
+      </div>
+    </section>
+    <!-- TAB 6: NUMBER COMPARATOR -->
+    <section id="tab-number" class="tab-content hidden flex-1 flex-col gap-4 h-full">
+      <div class="bg-cyber-panel p-4 rounded-xl border border-slate-800">
+        <h2 class="text-lg font-bold text-amber-400 flex items-center gap-2">
+          <i data-lucide="calculator" class="w-5 h-5"></i>
+          Option 6: Number Comparator & Math Evaluator
+        </h2>
+        <p class="text-xs text-slate-400 font-mono">Evaluate integer comparisons (-gt, -lt, -eq) with dynamic visual gauges.</p>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="bg-cyber-dark border border-slate-800 rounded-xl p-4 space-y-3">
+          <div class="flex justify-between items-center text-xs font-mono">
+            <span class="text-slate-400">First Number (num1)</span>
+            <span id="numVal1" class="text-amber-400 font-bold">42</span>
+          </div>
+          <input type="range" id="numRange1" min="-100" max="100" value="42" class="w-full accent-amber-400 cursor-pointer" />
+        </div>
+        <div class="bg-cyber-dark border border-slate-800 rounded-xl p-4 space-y-3">
+          <div class="flex justify-between items-center text-xs font-mono">
+            <span class="text-slate-400">Second Number (num2)</span>
+            <span id="numVal2" class="text-cyber-neonCyan font-bold">18</span>
+          </div>
+          <input type="range" id="numRange2" min="-100" max="100" value="18" class="w-full accent-cyan-400 cursor-pointer" />
+        </div>
+      </div>
+      <!-- Visual Math Output -->
+      <div class="flex-1 bg-cyber-dark border border-slate-800 rounded-xl p-5 flex flex-col justify-between font-mono">
+        <div class="space-y-4">
+          <div id="numResultBanner" class="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold text-center text-base">
+            <!-- Result string -->
+          </div>
+          <div class="grid grid-cols-3 gap-3 text-center text-xs">
+            <div class="bg-cyber-panel p-3 rounded border border-slate-800">
+              <span class="text-slate-500 text-[10px]">EQUAL (-eq)</span>
+              <p id="numEq" class="text-sm font-bold mt-1">FALSE</p>
+            </div>
+            <div class="bg-cyber-panel p-3 rounded border border-slate-800">
+              <span class="text-slate-500 text-[10px]">GREATER THAN (-gt)</span>
+              <p id="numGt" class="text-sm font-bold mt-1">TRUE</p>
+            </div>
+            <div class="bg-cyber-panel p-3 rounded border border-slate-800">
+              <span class="text-slate-500 text-[10px]">LESS THAN (-lt)</span>
+              <p id="numLt" class="text-sm font-bold mt-1">FALSE</p>
+            </div>
+          </div>
+        </div>
+        <div class="bg-cyber-black p-3 rounded border border-slate-800 text-xs">
+          <span class="text-slate-500">// Shell Test Logic:</span>
+          <div class="text-amber-400 mt-1">if [ $firstNumber -gt$secondNumber ]; then ...</div>
+        </div>
+      </div>
+    </section>
+    <!-- TAB 7: FILE STATS / INSPECTOR -->
+    <section id="tab-stats" class="tab-content hidden flex-1 flex-col gap-4 h-full">
+      <div class="bg-cyber-panel p-4 rounded-xl border border-slate-800 flex items-center justify-between">
+        <div>
+          <h2 class="text-lg font-bold text-teal-400 flex items-center gap-2">
+            <i data-lucide="bar-chart-2" class="w-5 h-5"></i>
+            Option 7: File Inspector & Metrics (wc)
+          </h2>
+          <p class="text-xs text-slate-400 font-mono">Detailed word count, line metrics, and density visualization.</p>
+        </div>
+        <select id="statsFileSelect" class="bg-cyber-dark border border-slate-700 text-xs text-slate-200 rounded-lg px-3 py-2 font-mono">
+          <!-- Files -->
+        </select>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 font-mono">
+        <div class="bg-cyber-dark border border-slate-800 rounded-xl p-4 text-center">
+          <span class="text-xs text-slate-500 uppercase">Lines (wc -l)</span>
+          <p id="statLines" class="text-3xl font-bold text-teal-400 mt-1">0</p>
+        </div>
+        <div class="bg-cyber-dark border border-slate-800 rounded-xl p-4 text-center">
+          <span class="text-xs text-slate-500 uppercase">Words (wc -w)</span>
+          <p id="statWords" class="text-3xl font-bold text-cyber-neonCyan mt-1">0</p>
+        </div>
+        <div class="bg-cyber-dark border border-slate-800 rounded-xl p-4 text-center">
+          <span class="text-xs text-slate-500 uppercase">Bytes (wc -c)</span>
+          <p id="statBytes" class="text-3xl font-bold text-cyber-neonPink mt-1">0</p>
+        </div>
+      </div>
+      <div class="flex-1 bg-cyber-dark border border-slate-800 rounded-xl p-4 font-mono flex flex-col justify-center space-y-4">
+        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">File Content Visualizer</h3>
+        <div class="space-y-2">
+          <div class="flex justify-between text-xs text-slate-400">
+            <span>Text Density Index</span>
+            <span id="statDensity">0%</span>
+          </div>
+          <div class="w-full bg-cyber-panel h-3 rounded-full overflow-hidden border border-slate-800">
+            <div id="statBar" class="bg-gradient-to-r from-teal-400 to-cyber-neonCyan h-full w-0 transition-all duration-500"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <!-- TAB 8: APPEND TEXT -->
+    <section id="tab-append" class="tab-content hidden flex-1 flex-col gap-4 h-full">
+      <div class="bg-cyber-panel p-4 rounded-xl border border-slate-800 flex items-center justify-between">
+        <div>
+          <h2 class="text-lg font-bold text-emerald-400 flex items-center gap-2">
+            <i data-lucide="corner-down-right" class="w-5 h-5"></i>
+            Option 8: Append Text to File (&gt;&gt;)
+          </h2>
+          <p class="text-xs text-slate-400 font-mono">Append new lines to an existing file without deleting current records.</p>
+        </div>
+        <select id="appendFileSelect" class="bg-cyber-dark border border-slate-700 text-xs text-slate-200 rounded-lg px-3 py-2 font-mono">
+          <!-- Files -->
+        </select>
+      </div>
+      <div class="flex-1 bg-cyber-dark border border-slate-800 rounded-xl p-4 flex flex-col font-mono text-sm gap-3">
+        <label class="text-xs text-slate-400">Line to Append:</label>
+        <input type="text" id="appendTextInput" placeholder="Type text to append to file..." class="bg-cyber-panel border border-slate-700 rounded p-2.5 text-sm font-mono text-white outline-none focus:border-emerald-400" />
+        <button id="executeAppendBtn" class="py-2.5 bg-emerald-500/20 border border-emerald-500/40 hover:bg-emerald-500/30 text-emerald-400 font-bold rounded text-xs transition-all flex items-center justify-center gap-2">
+          <i data-lucide="plus-circle" class="w-4 h-4"></i>
+          APPEND LINE TO FILE
+        </button>
+        <div class="flex-1 bg-cyber-panel/50 p-3 rounded border border-slate-800 overflow-y-auto text-xs space-y-1 text-slate-300">
+          <span class="text-slate-500 block pb-1 border-b border-slate-800">// Current Target File Preview:</span>
+          <div id="appendFilePreview"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<!-- SCRIPT VIEWER / EXPORT MODAL -->
+<div id="scriptModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+  <div class="bg-cyber-dark border border-cyber-cyan/40 rounded-xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden font-mono">
+    <div class="bg-cyber-panel px-5 py-3 border-b border-slate-800 flex items-center justify-between">
+      <h3 class="text-sm font-bold text-cyber-neonCyan flex items-center gap-2">
+        <i data-lucide="code" class="w-4 h-4"></i>
+        Lab8_complete.sh - Full Source Code
+      </h3>
+      <button id="closeModalBtn" class="text-slate-400 hover:text-white">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+    </div>
+    <div class="p-4 flex-1 overflow-y-auto bg-cyber-black text-xs text-slate-300 leading-relaxed">
+      <pre><code id="scriptModalCode">
+#!/usr/bin/env bash
+# Display the main menu options
+display_menu() {
+  echo ""
+  echo "========================================"
+  echo "       Enhanced Script Utility Menu     "
+  echo "========================================"
+  echo "1) Read contents from a file"
+  echo "2) Copy contents from one file into another"
+  echo "3) Write contents into a file (Overwrite)"
+  echo "4) Compare 2 strings"
+  echo "5) Search a file for a word"
+  echo "6) Compare 2 numbers"
+  echo "7) Count lines, words, and characters in a file"
+  echo "8) Append text to a file"
+  echo "0) Exit script"
+  echo "========================================"
+  echo ""
+}
+
+# 1) Read contents from a file
+read_file() {
+  read -rp "Enter the filename to read: " filename
+  if [[ -f "$filename" ]]; then
+    echo "--- File Content Start ---"
+    cat "$filename"
+    echo "--- File Content End ---"
+  else
+    echo "Error: File '$filename' does not exist."
+  fi
+}
+
+# 2) Copy contents from one file into another
+copy_file() {
+  read -rp "Enter the source file to copy from: " sourceFile
+  if [[ ! -f "$sourceFile" ]]; then
+    echo "Error: Source file '$sourceFile' does not exist."
+    return
+  fi
+  read -rp "Enter the destination file: " destFile
+  cp "$sourceFile" "$destFile"
+  echo "Successfully copied contents from '$sourceFile' to '$destFile'."
+}
+
+# 3) Write contents into a file (Overwrites existing contents)
+write_file() {
+  read -rp "Enter the filename to write to: " outputFile
+  echo "Enter text to write to the file. Enter 'x' on a new line to finish."
+  > "$outputFile"
+  while true; do
+    read -rp "> " line
+    if [[ "$line" == "x" ]]; then
+      echo "Exiting file write..."
+      break
+    fi
+    echo "$line" >> "$outputFile"
+  done
+}
+
+# 4) Compare 2 strings
+compare_strings() {
+  read -rp "Enter the first string: " str1
+  read -rp "Enter the second string: " str2
+  if [[ "$str1" == "$str2" ]]; then
+    echo "Both strings are identical."
+  else
+    echo "The strings are different."
+  fi
+}
+
+# 5) Search a file for a word
+search_word() {
+  read -rp "Enter the word/pattern to search for: " word
+  read -rp "Enter the filename to search in: " filename
+  if [[ ! -f "$filename" ]]; then
+    echo "Error: File '$filename' does not exist."
+    return
+  fi
+  grep -n --color=auto "$word" "$filename" || echo "No matches found."
+}
+
+# 6) Compare 2 numbers
+compare_numbers() {
+  read -rp "Enter the first number: " num1
+  read -rp "Enter the second number: " num2
+  if ((num1 == num2)); then
+    echo "$num1 is equal to $num2"
+  elif ((num1 > num2)); then
+    echo "$num1 is greater than $num2"
+  else
+    echo "$num1 is less than $num2"
+  fi
+}
+
+# Main Loop
+option=-1
+while [[ "$option" != "0" ]]; do
+  display_menu
+  read -rp "Select an option [0-8]: " option
+  case "$option" in
+    1) read_file ;;
+    2) copy_file ;;
+    3) write_file ;;
+    4) compare_strings ;;
+    5) search_word ;;
+    6) compare_numbers ;;
+    0) echo "Exiting script... Goodbye!" ;;
+  esac
+done
+</code></pre>
+    </div>
+    <div class="bg-cyber-panel p-3 border-t border-slate-800 flex justify-end gap-3">
+      <button id="copyScriptBtn" class="px-4 py-2 bg-cyber-cyan/20 border border-cyber-cyan/40 hover:bg-cyber-cyan/30 text-cyber-cyan text-xs font-bold rounded">
+        COPY CODE TO CLIPBOARD
+      </button>
+    </div>
+  </div>
+</div>
+<!-- JAVASCRIPT APPLICATION LOGIC -->
+<script>
+// Initialize Lucide Icons
+lucide.createIcons();
+
+//
+// AUDIO SFX SIMULATION (Web Audio API)
+//
+let sfxEnabled = true;
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function playBeep(freq = 600, duration = 0.04, type = 'sine') {
+  if (!sfxEnabled) return;
+  try {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.02, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+  } catch(e){}
+}
+
+document.getElementById('sfxToggle').addEventListener('click', () => {
+  sfxEnabled = !sfxEnabled;
+  const icon = document.getElementById('sfxIcon');
+  if (sfxEnabled) {
+    icon.setAttribute('data-lucide', 'volume-2');
+    playBeep(800, 0.08);
+  } else {
+    icon.setAttribute('data-lucide', 'volume-x');
+  }
+  lucide.createIcons();
+});
+
+//
+// MATRIX DIGITAL RAIN CANVAS EFFECT
+//
+const canvas = document.getElementById('matrixCanvas');
+const ctx = canvas.getContext('2d');
+let matrixInterval = null;
+
+function initMatrix() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const chars = "0101011001010101CYBERBASH_LINUX_GNU_SHELL_GCC_CAT_GREP";
+  const fontSize = 12;
+  const columns = canvas.width / fontSize;
+  const drops = Array.from({ length: Math.floor(columns) }).fill(1);
+
+  function draw() {
+    ctx.fillStyle = 'rgba(10, 12, 16, 0.08)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#00ff66';
+    ctx.font = fontSize + 'px monospace';
+    for (let i = 0; i < drops.length; i++) {
+      const text = chars[Math.floor(Math.random() * chars.length)];
+      ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+      if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+        drops[i] = 0;
+      }
+      drops[i]++;
+    }
+  }
+
+  if (matrixInterval) clearInterval(matrixInterval);
+  matrixInterval = setInterval(draw, 33);
+}
+initMatrix();
+window.addEventListener('resize', initMatrix);
+
+let matrixActive = true;
+document.getElementById('matrixToggle').addEventListener('click', () => {
+  matrixActive = !matrixActive;
+  canvas.style.display = matrixActive ? 'block' : 'none';
+  playBeep(500, 0.05);
+});
+
+//
+// RICKROLL TIMER (Every 1 Minute)
+//
+function triggerRickroll() {
+  const modal = document.getElementById('rickrollModal');
+  modal.classList.remove('hidden');
+  playBeep(400, 0.1, 'sawtooth');
+}
+
+document.getElementById('closeRickrollBtn').addEventListener('click', () => {
+  document.getElementById('rickrollModal').classList.add('hidden');
+  playBeep(600, 0.05);
+});
+
+// Trigger every 60,000 ms (1 minute)
+setInterval(triggerRickroll, 60000);
+
+//
+// VIRTUAL FILE SYSTEM STATE
+//
+const fileSystem = {
+  "welcome.txt": "Welcome to CyberBash Interactive Toolkit!\nThis virtual environment allows you to simulate Bash scripts.\nTry running options 1-8 from the terminal or sidebar menu.",
+  "config.sys": "ENABLE_CYBER_MODE=TRUE\nMAX_BUFFER_SIZE=1024\nDEFAULT_SHELL=/bin/bash\nSECURITY_LEVEL=HIGH",
+  "data.log": "2026-10-20 18:00:01 [INFO] System boot sequence complete.\n2026-10-20 18:02:14 [SUCCESS] Virtual storage mounted.\n2026-10-20 18:05:00 [DEBUG] Kernel process running cleanly.",
+  "numbers.txt": "10\n25\n42\n88\n100"
+};
+
+function updateFileDropdowns() {
+  const fileNames = Object.keys(fileSystem);
+  document.getElementById('headerFileCount').innerText = fileNames.length;
+  const dropdowns = [
+    'readerFileSelect',
+    'copySourceSelect',
+    'writerFileSelect',
+    'grepFileSelect',
+    'statsFileSelect',
+    'appendFileSelect'
+  ];
+  dropdowns.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const currentVal = el.value;
+    el.innerHTML = '';
+    fileNames.forEach(fn => {
+      const opt = document.createElement('option');
+      opt.value = fn;
+      opt.textContent = fn;
+      el.appendChild(opt);
+    });
+    if (fileNames.includes(currentVal)) {
+      el.value = currentVal;
+    }
+  });
+}
+
+renderSidebarExplorer();
+
+function renderSidebarExplorer() {
+  const list = document.getElementById('fileExplorerList');
+  list.innerHTML = '';
+  Object.keys(fileSystem).forEach(filename => {
+    const item = document.createElement('div');
+    item.className = 'flex items-center justify-between p-2 rounded hover:bg-slate-800/80 text-slate-300 font-mono text-xs cursor-pointer group transition-colors';
+    item.innerHTML = `
+      <div class="flex items-center gap-2 overflow-hidden">
+        <i data-lucide="file-text" class="w-3.5 h-3.5 text-cyber-neonCyan shrink-0"></i>
+        <span class="truncate">${filename}</span>
+      </div>
+      <button data-fn="${filename}" class="delete-file-btn opacity-0 group-hover:opacity-100 hover:text-red-400 p-1">
+        <i data-lucide="trash" class="w-3 h-3"></i>
+      </button>
+    `;
+    item.addEventListener('click', (e) => {
+      if (e.target.closest('.delete-file-btn')) return;
+      switchTab('tab-read');
+      document.getElementById('readerFileSelect').value = filename;
+      updateReaderView();
+      playBeep(700, 0.03);
+    });
+    list.appendChild(item);
+  });
+  
+  document.querySelectorAll('.delete-file-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const fn = btn.getAttribute('data-fn');
+      if (Object.keys(fileSystem).length <= 1) {
+        alert("Cannot delete the last remaining file!");
+        return;
+      }
+      delete fileSystem[fn];
+      updateFileDropdowns();
+      renderSidebarExplorer();
+      appendTerminalOutput(`File '${fn}' deleted from virtual filesystem.`, 'error');
+      playBeep(300, 0.1);
+    });
+  });
+  lucide.createIcons();
+}
+
+document.getElementById('addFileBtn').addEventListener('click', () => {
+  const name = prompt("Enter new filename:", "newfile.txt");
+  if (name && name.trim()) {
+    const cleanName = name.trim();
+    if (fileSystem[cleanName]) {
+      alert("File already exists!");
+      return;
+    }
+    fileSystem[cleanName] = "Initial content of " + cleanName;
+    updateFileDropdowns();
+    renderSidebarExplorer();
+    appendTerminalOutput(`Created new file: ${cleanName}`, 'success');
+    playBeep(900, 0.05);
+  }
+});
+
+//
+// NAVIGATION TABS SWITCHING
+//
+const navButtons = document.querySelectorAll('.nav-btn');
+const tabContents = document.querySelectorAll('.tab-content');
+
+function switchTab(tabId) {
+  navButtons.forEach(btn => {
+    if (btn.getAttribute('data-tab') === tabId) {
+      btn.classList.add('bg-cyber-cyan/10', 'border-cyber-cyan/40', 'text-cyber-cyan', 'shadow-neon-cyan');
+      btn.classList.remove('hover:bg-slate-800/60', 'border-transparent', 'text-slate-300');
+    } else {
+      btn.classList.remove('bg-cyber-cyan/10', 'border-cyber-cyan/40', 'text-cyber-cyan', 'shadow-neon-cyan');
+      btn.classList.add('hover:bg-slate-800/60', 'border-transparent', 'text-slate-300');
+    }
+  });
+  tabContents.forEach(content => {
+    if (content.id === tabId) {
+      content.classList.remove('hidden');
+      content.classList.add('flex');
+    } else {
+      content.classList.add('hidden');
+      content.classList.remove('flex');
+    }
+  });
+
+  if (tabId === 'tab-read') updateReaderView();
+  if (tabId === 'tab-copy') updateCopyView();
+  if (tabId === 'tab-write') updateWriterView();
+  if (tabId === 'tab-grep') updateGrepView();
+  if (tabId === 'tab-stats') updateStatsView();
+  if (tabId === 'tab-append') updateAppendView();
+  playBeep(650, 0.03);
+}
+
+navButtons.forEach(btn => {
+  btn.addEventListener('click', () => {
+    switchTab(btn.getAttribute('data-tab'));
+  });
+});
+
+//
+// TERMINAL INTERACTIVE SIMULATION ENGINE
+//
+const terminalScreen = document.getElementById('terminalScreen');
+const terminalInput = document.getElementById('terminalInput');
+
+function appendTerminalOutput(text, type = 'normal') {
+  const line = document.createElement('div');
+  line.className = 'font-mono text-xs leading-relaxed break-all';
+  if (type === 'cmd') {
+    line.innerHTML = '<span class="text-cyber-neonGreen font-bold">user@cyberbash:~\\$</span> <span class="text-white">' + escapeHtml(text) + '</span>';
+  } else if (type === 'system') {
+    line.className += ' text-cyber-neonCyan';
+    line.textContent = text;
+  } else if (type === 'error') {
+    line.className += ' text-cyber-neonPink';
+    line.textContent = text;
+  } else if (type === 'success') {
+    line.className += ' text-cyber-neonGreen';
+    line.textContent = text;
+  } else {
+    line.className += ' text-slate-300';
+    line.textContent = text;
+  }
+  terminalScreen.appendChild(line);
+  terminalScreen.scrollTop = terminalScreen.scrollHeight;
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function printMenu() {
+  appendTerminalOutput("========================================", 'system');
+  appendTerminalOutput("       CyberBash Lab 8 Script Utility Menu", 'system');
+  appendTerminalOutput("========================================", 'system');
+  appendTerminalOutput("1) Read contents from a file");
+  appendTerminalOutput("2) Copy contents from one file into another");
+  appendTerminalOutput("3) Write contents into a file (Overwrite)");
+  appendTerminalOutput("4) Compare 2 strings");
+  appendTerminalOutput("5) Search a file for a word");
+  appendTerminalOutput("6) Compare 2 numbers");
+  appendTerminalOutput("7) Count lines, words, and characters in a file");
+  appendTerminalOutput("8) Append text to a file");
+  appendTerminalOutput("0) Exit script");
+  appendTerminalOutput("========================================", 'system');
+}
+
+function handleTerminalCommand(cmdStr) {
+  const trimmed = cmdStr.trim();
+  if (!trimmed) return;
+  appendTerminalOutput(trimmed, 'cmd');
+  playBeep(400, 0.02);
+  const parts = trimmed.split(' ');
+  const mainCmd = parts[0];
+
+  if (/^[0-8]$/.test(mainCmd)) {
+    switch (mainCmd) {
+      case '1':
+        switchTab('tab-read');
+        appendTerminalOutput("Switched to File Reader tool.", 'success');
+        break;
+      case '2':
+        switchTab('tab-copy');
+        appendTerminalOutput("Switched to File Copy & Diff tool.", 'success');
+        break;
+      case '3':
+        switchTab('tab-write');
+        appendTerminalOutput("Switched to Text Writer tool.", 'success');
+        break;
+      case '4':
+        switchTab('tab-string');
+        appendTerminalOutput("Switched to String Comparator tool.", 'success');
+        break;
+      case '5':
+        switchTab('tab-grep');
+        appendTerminalOutput("Switched to Search Word / Grep tool.", 'success');
+        break;
+      case '6':
+        switchTab('tab-number');
+        appendTerminalOutput("Switched to Number Comparator tool.", 'success');
+        break;
+      case '7':
+        switchTab('tab-stats');
+        appendTerminalOutput("Switched to File Stats tool.", 'success');
+        break;
+      case '8':
+        switchTab('tab-append');
+        appendTerminalOutput("Switched to Append Text tool.", 'success');
+        break;
+      case '0':
+        appendTerminalOutput("Exiting bash script session... Goodbye!", 'error');
+        break;
+    }
+    return;
+  }
+
+  switch (mainCmd.toLowerCase()) {
+    case 'help':
+      appendTerminalOutput("Available Commands: 0-8 (menu choices), cat, ls, grep, clear, echo, wc, help");
+      break;
+    case 'clear':
+      terminalScreen.innerHTML = '';
+      break;
+    case 'ls':
+      appendTerminalOutput(Object.keys(fileSystem).join(' '), 'success');
+      break;
+    case 'cat':
+      if (parts[1] && fileSystem[parts[1]]) {
+        appendTerminalOutput(fileSystem[parts[1]]);
+      } else {
+        appendTerminalOutput("Error: File not found. Usage: cat <filename>", 'error');
+      }
+      break;
+    case 'wc':
+      if (parts[1] && fileSystem[parts[1]]) {
+        const content = fileSystem[parts[1]];
+        const lines = content.split('\n').length;
+        const words = content.trim().split(/\s+/).filter(Boolean).length;
+        const chars = content.length;
+        appendTerminalOutput(`${lines} ${words} ${chars} ${parts[1]}`, 'success');
+      } else {
+        appendTerminalOutput("Usage: wc <filename>", 'error');
+      }
+      break;
+    default:
+      appendTerminalOutput(`bash: command not found: ${mainCmd}. Type 'help' or enter menu option 0-8.`, 'error');
+  }
+}
+
+terminalInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    handleTerminalCommand(terminalInput.value);
+    terminalInput.value = '';
+  }
+});
+
+document.getElementById('sendCmdBtn').addEventListener('click', () => {
+  handleTerminalCommand(terminalInput.value);
+  terminalInput.value = '';
+});
+
+document.getElementById('clearTerminalBtn').addEventListener('click', () => {
+  terminalScreen.innerHTML = '';
+  playBeep(300, 0.05);
+});
+
+document.getElementById('resetMenuBtn').addEventListener('click', () => {
+  printMenu();
+});
+
+printMenu();
+
+//
+// TAB 1: FILE READER ENGINE
+//
+function updateReaderView() {
+  const select = document.getElementById('readerFileSelect');
+  const filename = select.value || Object.keys(fileSystem)[0];
+  const content = fileSystem[filename] || "";
+  document.getElementById('readerFileName').textContent = filename;
+  const lines = content.split('\n');
+  const words = content.trim().split(/\s+/).filter(Boolean).length;
+  document.getElementById('readerLineCount').textContent = `${lines.length} Lines`;
+  document.getElementById('readerWordCount').textContent = `${words} Words`;
+  document.getElementById('readerCharCount').textContent = `${content.length} Bytes`;
+  
+  const viewer = document.getElementById('readerCodeViewer');
+  viewer.innerHTML = '';
+  lines.forEach((lineText, idx) => {
+    const row = document.createElement('div');
+    row.className = 'flex items-start gap-4 hover:bg-slate-800/40 px-2 py-0.5 rounded';
+    row.innerHTML = `
+      <span class="text-slate-600 select-none w-8 text-right font-mono text-xs">${idx + 1}</span>
+      <span class="font-mono text-xs text-slate-200 leading-relaxed break-all">${escapeHtml(lineText)}</span>
+    `;
+    viewer.appendChild(row);
+  });
+}
+document.getElementById('readerFileSelect').addEventListener('change', updateReaderView);
+
+//
+// TAB 2: COPY FILE ENGINE
+//
+function updateCopyView() {
+  const source = document.getElementById('copySourceSelect').value;
+  const content = fileSystem[source] || "";
+  document.getElementById('copySourceContent').textContent = content;
+}
+document.getElementById('copySourceSelect').addEventListener('change', updateCopyView);
+
+document.getElementById('executeCopyBtn').addEventListener('click', () => {
+  const source = document.getElementById('copySourceSelect').value;
+  const target = document.getElementById('copyTargetInput').value.trim();
+  if (!target) {
+    alert("Please enter a target filename!");
+    return;
+  }
+  fileSystem[target] = fileSystem[source];
+  updateFileDropdowns();
+  renderSidebarExplorer();
+  const targetBox = document.getElementById('copyTargetContent');
+  targetBox.classList.remove('italic', 'text-slate-400', 'justify-center', 'border-dashed');
+  targetBox.textContent = fileSystem[target];
+  appendTerminalOutput(`Copied '${source}' to '${target}' successfully.`, 'success');
+  playBeep(900, 0.08);
+});
+
+//
+// TAB 3: FILE EDITOR ENGINE
+//
+function updateWriterView() {
+  const select = document.getElementById('writerFileSelect');
+  const filename = select.value || Object.keys(fileSystem)[0];
+  const area = document.getElementById('writerTextArea');
+  area.value = fileSystem[filename] || "";
+  document.getElementById('writerCharCount').textContent = `${area.value.length} chars`;
+}
+document.getElementById('writerFileSelect').addEventListener('change', updateWriterView);
+
+document.getElementById('writerTextArea').addEventListener('input', (e) => {
+  document.getElementById('writerCharCount').textContent = `${e.target.value.length} chars`;
+});
+
+document.getElementById('saveWriteBtn').addEventListener('click', () => {
+  const select = document.getElementById('writerFileSelect');
+  const filename = select.value;
+  const content = document.getElementById('writerTextArea').value;
+  fileSystem[filename] = content;
+  updateFileDropdowns();
+  renderSidebarExplorer();
+  appendTerminalOutput(`Overwritten content into '${filename}'.`, 'success');
+  playBeep(800, 0.06);
+});
+
+//
+// TAB 4: STRING COMPARATOR
+//
+function evaluateStrings() {
+  const s1 = document.getElementById('strInput1').value;
+  const s2 = document.getElementById('strInput2').value;
+  document.getElementById('str1Len').textContent = s1.length;
+  document.getElementById('str2Len').textContent = s2.length;
+  const badge = document.getElementById('strMatchBadge');
+  if (s1 === s2) {
+    badge.textContent = "EXACT MATCH";
+    badge.className = "px-3 py-1 rounded text-xs font-bold bg-cyber-neonGreen/20 text-cyber-neonGreen border border-cyber-neonGreen/40 shadow-neon-green";
+  } else {
+    badge.textContent = "STRINGS DIFFER";
+    badge.className = "px-3 py-1 rounded text-xs font-bold bg-cyber-neonPink/20 text-cyber-neonPink border border-cyber-neonPink/40 shadow-neon-pink";
+  }
+  let matches = 0;
+  const maxLen = Math.max(s1.length, s2.length);
+  if (maxLen === 0) {
+    document.getElementById('strSimilarity').textContent = "100%";
+    return;
+  }
+  for (let i = 0; i < Math.min(s1.length, s2.length); i++) {
+    if (s1[i] === s2[i]) matches++;
+  }
+  const pct = Math.round((matches / maxLen) * 100);
+  document.getElementById('strSimilarity').textContent = `${pct}%`;
+}
+document.getElementById('strInput1').addEventListener('input', evaluateStrings);
+document.getElementById('strInput2').addEventListener('input', evaluateStrings);
+evaluateStrings();
+
+//
+// TAB 5: GREP SEARCH ENGINE
+//
+function updateGrepView() {
+  const term = document.getElementById('grepSearchTerm').value.trim();
+  const fn = document.getElementById('grepFileSelect').value;
+  const content = fileSystem[fn] || "";
+  const container = document.getElementById('grepResultsContainer');
+  container.innerHTML = '';
+  if (!term) {
+    container.innerHTML = '<div class="text-slate-500 italic">Enter a search term above...</div>';
+    document.getElementById('grepMatchCount').textContent = '0 matches';
+    return;
+  }
+  const lines = content.split('\n');
+  let matchesCount = 0;
+  lines.forEach((line, idx) => {
+    if (line.toLowerCase().includes(term.toLowerCase())) {
+      matchesCount++;
+      const regex = new RegExp(`(${term})`, 'gi');
+      const highlighted = escapeHtml(line).replace(regex, '<mark class="bg-cyber-neonPurple/40 text-white rounded px-1">$1</mark>');
+      const item = document.createElement('div');
+      item.className = 'bg-cyber-panel/60 border border-slate-800 p-2.5 rounded font-mono text-xs flex gap-3 items-start';
+      item.innerHTML = `
+        <span class="text-cyber-neonPurple font-bold">Line ${idx + 1}:</span>
+        <span class="text-slate-200 leading-relaxed flex-1">${highlighted}</span>
+      `;
+      container.appendChild(item);
+    }
+  });
+  document.getElementById('grepMatchCount').textContent = `${matchesCount} matches`;
+}
+document.getElementById('grepSearchTerm').addEventListener('input', updateGrepView);
+document.getElementById('grepFileSelect').addEventListener('change', updateGrepView);
+
+//
+// TAB 6: NUMBER COMPARATOR
+//
+function evaluateNumbers() {
+  const n1 = parseInt(document.getElementById('numRange1').value, 10);
+  const n2 = parseInt(document.getElementById('numRange2').value, 10);
+  document.getElementById('numVal1').textContent = n1;
+  document.getElementById('numVal2').textContent = n2;
+  const banner = document.getElementById('numResultBanner');
+  const eq = document.getElementById('numEq');
+  const gt = document.getElementById('numGt');
+  const lt = document.getElementById('numLt');
+
+  eq.textContent = (n1 === n2) ? "TRUE" : "FALSE";
+  eq.className = `text-sm font-bold mt-1 ${(n1 === n2) ? 'text-cyber-neonGreen' : 'text-slate-500'}`;
+  gt.textContent = (n1 > n2) ? "TRUE" : "FALSE";
+  gt.className = `text-sm font-bold mt-1 ${(n1 > n2) ? 'text-cyber-neonGreen' : 'text-slate-500'}`;
+  lt.textContent = (n1 < n2) ? "TRUE" : "FALSE";
+  lt.className = `text-sm font-bold mt-1 ${(n1 < n2) ? 'text-cyber-neonGreen' : 'text-slate-500'}`;
+
+  if (n1 === n2) {
+    banner.textContent = `${n1} is equal to ${n2}`;
+    banner.className = "p-4 rounded-lg bg-cyber-neonGreen/10 border border-cyber-neonGreen/30 text-cyber-neonGreen font-bold text-center text-base";
+  } else if (n1 > n2) {
+    banner.textContent = `${n1} is greater than ${n2}`;
+    banner.className = "p-4 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold text-center text-base";
+  } else {
+    banner.textContent = `${n1} is less than ${n2}`;
+    banner.className = "p-4 rounded-lg bg-cyber-neonCyan/10 border border-cyber-neonCyan/30 text-cyber-neonCyan font-bold text-center text-base";
+  }
+}
+document.getElementById('numRange1').addEventListener('input', evaluateNumbers);
+document.getElementById('numRange2').addEventListener('input', evaluateNumbers);
+evaluateNumbers();
+
+//
+// TAB 7: FILE STATS ENGINE
+//
+function updateStatsView() {
+  const fn = document.getElementById('statsFileSelect').value;
+  const content = fileSystem[fn] || "";
+  const lines = content.split('\n').length;
+  const words = content.trim().split(/\s+/).filter(Boolean).length;
+  const bytes = content.length;
+  document.getElementById('statLines').textContent = lines;
+  document.getElementById('statWords').textContent = words;
+  document.getElementById('statBytes').textContent = bytes;
+  const density = Math.min(100, Math.round((bytes / 500) * 100));
+  document.getElementById('statDensity').textContent = `${density}%`;
+  document.getElementById('statBar').style.width = `${density}%`;
+}
+document.getElementById('statsFileSelect').addEventListener('change', updateStatsView);
+
+//
+// TAB 8: APPEND TEXT ENGINE
+//
+function updateAppendView() {
+  const fn = document.getElementById('appendFileSelect').value;
+  document.getElementById('appendFilePreview').textContent = fileSystem[fn] || "";
+}
+document.getElementById('appendFileSelect').addEventListener('change', updateAppendView);
+
+document.getElementById('executeAppendBtn').addEventListener('click', () => {
+  const fn = document.getElementById('appendFileSelect').value;
+  const line = document.getElementById('appendTextInput').value;
+  if (!line) {
+    alert("Please enter a line of text to append!");
+    return;
+  }
+  fileSystem[fn] += "\n" + line;
+  document.getElementById('appendTextInput').value = '';
+  updateAppendView();
+  appendTerminalOutput(`Appended line to '${fn}'.`, 'success');
+  playBeep(750, 0.05);
+});
+
+//
+// SCRIPT EXPORT MODAL LOGIC
+//
+const modal = document.getElementById('scriptModal');
+document.getElementById('viewScriptBtn').addEventListener('click', () => {
+  modal.classList.remove('hidden');
+  playBeep(700, 0.04);
+});
+document.getElementById('closeModalBtn').addEventListener('click', () => {
+  modal.classList.add('hidden');
+});
+document.getElementById('copyScriptBtn').addEventListener('click', () => {
+  const code = document.getElementById('scriptModalCode').innerText;
+  const dummy = document.createElement("textarea");
+  document.body.appendChild(dummy);
+  dummy.value = code;
+  dummy.select();
+  document.execCommand("copy");
+  document.body.removeChild(dummy);
+  alert("Bash Script copied to clipboard!");
+  playBeep(900, 0.08);
+});
+
+// Initial Setup
+updateFileDropdowns();
+</script>
+</body>
+</html>
